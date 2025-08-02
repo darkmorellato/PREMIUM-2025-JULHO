@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel PREMIUM</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts - Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* Cor de fundo suave */
+        }
+        /* Estilo personalizado para o canvas ser responsivo */
+        canvas {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+    <div class="bg-white shadow-xl rounded-xl p-8 max-w-4xl w-full">
+        <h1 class="text-4xl font-extrabold text-gray-800 mb-6 text-center">
+             Análise de Vendas Premium
+        </h1>
+
+        <!-- Seção de Resumo -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+            <div class="bg-blue-500 text-white p-6 rounded-lg shadow-md flex flex-col items-center justify-center">
+                <p class="text-sm font-semibold opacity-80">Total de Itens Vendidos</p>
+                <p id="total-items" class="text-5xl font-bold mt-2">0</p>
+            </div>
+            <div class="bg-purple-500 text-white p-6 rounded-lg shadow-md flex flex-col items-center justify-center">
+                <p class="text-sm font-semibold opacity-80">Período</p>
+                <p class="text-3xl font-bold mt-2">Julho 2025</p>
+            </div>
+            <div class="bg-green-500 text-white p-6 rounded-lg shadow-md flex flex-col items-center justify-center">
+                <p class="text-sm font-semibold opacity-80">Análise de Produtos</p>
+                <p class="text-3xl font-bold mt-2">Detalhada</p>
+            </div>
+        </div>
+
+        <!-- Seção de Gráfico de Pizza -->
+        <div class="bg-gray-50 p-6 rounded-lg shadow-inner mb-8">
+            <h2 class="text-2xl font-bold text-gray-700 mb-4 text-center">Distribuição Percentual de Produtos</h2>
+            <div class="relative h-96 w-full flex justify-center items-center">
+                <canvas id="productPieChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Seção de Gráfico de Barras (Quantidade) -->
+        <div class="bg-gray-50 p-6 rounded-lg shadow-inner mb-8">
+            <h2 class="text-2xl font-bold text-gray-700 mb-4 text-center">Quantidade de Produtos Vendidos</h2>
+            <div class="relative h-96 w-full flex justify-center items-center">
+                <canvas id="productBarChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Seção da Tabela de Detalhes -->
+        <div class="bg-gray-50 p-6 rounded-lg shadow-inner">
+            <h2 class="text-2xl font-bold text-gray-700 mb-4 text-center">Detalhes dos Itens Vendidos</h2>
+            <div class="overflow-x-auto">
+                <table class="min-w-full bg-white rounded-lg shadow-md">
+                    <thead>
+                        <tr class="bg-gray-200 text-gray-700 uppercase text-sm leading-normal">
+                            <th class="py-3 px-6 text-left rounded-tl-lg">Produto</th>
+                            <th class="py-3 px-6 text-left">Quantidade</th>
+                            <th class="py-3 px-6 text-left rounded-tr-lg">Porcentagem</th>
+                        </tr>
+                    </thead>
+                    <tbody id="product-table-body" class="text-gray-600 text-sm font-light">
+                        <!-- Linhas da tabela serão inseridas aqui pelo JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Dados do arquivo CSV fornecido (PR TEST.xlsx - Point of Sale Analysis.csv)
+        let productData = [
+            { name: "BRINDES", quantity: 13, percentage: 0.081761006289308172 },
+            { name: "CAPAS", quantity: 3, percentage: 0.018867924528301886 },
+            { name: "CHIP", quantity: 16, percentage: 0.10062893081761007 },
+            { name: "DESCONTO", quantity: 10, percentage: 0.062893081761006289 },
+            { name: "HONOR", quantity: 30, percentage: 0.18867924528301888 },
+            { name: "PAGAMENTOS", quantity: 3, percentage: 0.018867924528301886 },
+            { name: "POCO", quantity: 19, percentage: 0.11949685534591195 },
+            { name: "REALME", quantity: 7, percentage: 0.0440251572327044 },
+            { name: "REDMI", quantity: 9, percentage: 0.056603773584905662 },
+            { name: "ROCK SPACE", quantity: 46, percentage: 0.28930817610062892 },
+            { name: "SERVIÇOS", quantity: 3, percentage: 0.018867924528301886 }
+        ];
+
+        // Ordenar os dados por quantidade do maior para o menor
+        productData.sort((a, b) => b.quantity - a.quantity);
+
+        // Extrair rótulos (nomes dos produtos) e dados (quantidades)
+        const labels = productData.map(item => item.name);
+        const quantities = productData.map(item => item.quantity);
+
+        // Calcular o total de itens vendidos
+        const totalItems = quantities.reduce((sum, current) => sum + current, 0);
+        document.getElementById('total-items').innerText = totalItems;
+
+        // Gerar cores dinâmicas para o gráfico
+        function generateColors(numColors) {
+            const colors = [];
+            for (let i = 0; i < numColors; i++) {
+                const hue = (i * 360 / numColors) % 360;
+                colors.push(`hsl(${hue}, 70%, 60%)`); // Cores vibrantes
+            }
+            return colors;
+        }
+
+        const backgroundColors = generateColors(labels.length);
+        const borderColors = backgroundColors.map(color => color.replace('60%', '50%')); // Bordas um pouco mais escuras
+
+        // Configurar o gráfico de pizza
+        const pieCtx = document.getElementById('productPieChart').getContext('2d');
+        // Destruir o gráfico existente antes de criar um novo para evitar sobreposição
+        if (window.productPieChartInstance) {
+            window.productPieChartInstance.destroy();
+        }
+        window.productPieChartInstance = new Chart(pieCtx, {
+            type: 'pie',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: quantities,
+                    backgroundColor: backgroundColors,
+                    borderColor: borderColors,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false, // Permite que o gráfico se ajuste ao tamanho do contêiner
+                plugins: {
+                    legend: {
+                        position: 'right', // Posição da legenda
+                        labels: {
+                            font: {
+                                size: 14,
+                                family: 'Inter',
+                                weight: '600'
+                            },
+                            color: '#4b5563' // Cor do texto da legenda
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.raw;
+                                const total = context.dataset.data.reduce((acc, current) => acc + current, 0);
+                                const percentage = ((value / total) * 100).toFixed(2);
+                                return `${label}: ${value} (${percentage}%)`;
+                            }
+                        },
+                        titleFont: {
+                            family: 'Inter',
+                            size: 16
+                        },
+                        bodyFont: {
+                            family: 'Inter',
+                            size: 14
+                        },
+                        padding: 10,
+                        backgroundColor: 'rgba(0,0,0,0.8)',
+                        cornerRadius: 8
+                    }
+                }
+            }
+        });
+
+        // Configurar o gráfico de barras (quantidade)
+        const barCtx = document.getElementById('productBarChart').getContext('2d');
+        // Destruir o gráfico existente antes de criar um novo para evitar sobreposição
+        if (window.productBarChartInstance) {
+            window.productBarChartInstance.destroy();
+        }
+        window.productBarChartInstance = new Chart(barCtx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Quantidade Vendida',
+                    data: quantities,
+                    backgroundColor: backgroundColors,
+                    borderColor: borderColors,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false // Não exibir legenda para o gráfico de barras (o rótulo já está no eixo)
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `${context.dataset.label}: ${context.raw}`;
+                            }
+                        },
+                        titleFont: {
+                            family: 'Inter',
+                            size: 16
+                        },
+                        bodyFont: {
+                            family: 'Inter',
+                            size: 14
+                        },
+                        padding: 10,
+                        backgroundColor: 'rgba(0,0,0,0.8)',
+                        cornerRadius: 8
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Quantidade',
+                            font: {
+                                size: 16,
+                                family: 'Inter',
+                                weight: 'bold'
+                            },
+                            color: '#4b5563'
+                        },
+                        ticks: {
+                            font: {
+                                family: 'Inter'
+                            },
+                            color: '#4b5563'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Produto',
+                            font: {
+                                size: 16,
+                                family: 'Inter',
+                                weight: 'bold'
+                            },
+                            color: '#4b5563'
+                        },
+                        ticks: {
+                            font: {
+                                family: 'Inter'
+                            },
+                            color: '#4b5563'
+                        }
+                    }
+                }
+            }
+        });
+
+        // Preencher a tabela de detalhes dos produtos
+        const tableBody = document.getElementById('product-table-body');
+        // Limpa qualquer conteúdo existente antes de adicionar os novos dados ordenados
+        tableBody.innerHTML = '';
+        productData.forEach(item => {
+            const row = document.createElement('tr');
+            row.classList.add('border-b', 'border-gray-200', 'hover:bg-gray-100');
+
+            const productNameCell = document.createElement('td');
+            productNameCell.classList.add('py-3', 'px-6', 'text-left', 'whitespace-nowrap');
+            productNameCell.textContent = item.name;
+
+            const quantityCell = document.createElement('td');
+            quantityCell.classList.add('py-3', 'px-6', 'text-left');
+            quantityCell.textContent = item.quantity;
+
+            const percentageCell = document.createElement('td');
+            percentageCell.classList.add('py-3', 'px-6', 'text-left');
+            percentageCell.textContent = `${(item.percentage * 100).toFixed(2)}%`;
+
+            row.appendChild(productNameCell);
+            row.appendChild(quantityCell);
+            row.appendChild(percentageCell);
+            tableBody.appendChild(row);
+        });
+    </script>
+</body>
+</html>
